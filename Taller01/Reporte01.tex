@@ -1,42 +1,124 @@
 \documentclass[journal]{IEEEtran}
-
 \usepackage{cite}
 \usepackage{amsmath,amssymb,amsfonts}
 \usepackage{algorithmic}
 \usepackage{graphicx}
 \usepackage{textcomp}
 \usepackage{xcolor}
+\usepackage{booktabs}
 
 \begin{document}
 
-\title{Simple Schema for IEEE Transactions on Artificial Intelligence}
+\title{Laboratorio: Regresión lineal \\ Estimación de Costos Médicos}
 
-\author{Author Name}
+\author{Salomón Avila, Carlos Caicedo
+\thanks{}}
 
 \maketitle
 
 \begin{abstract}
-This document provides a minimal IEEE-style schema for a paper intended for IEEE Transactions on Artificial Intelligence.
+En este trabajo se implementa desde cero el algoritmo de descenso de gradiente para ajustar un modelo de regresión lineal. El modelo busca estimar los costos médicos anuales de un asegurado a partir de variables demográficas y de salud (edad, sexo, índice de masa corporal, número de hijos, hábito de fumar y región de residencia). Se implementó una función genérica \texttt{fit\_model} capaz de operar sobre conjuntos de datos $X$ de dimensión arbitraria, y se evaluó el desempeño del modelo mediante la raíz del error cuadrático medio (RMSE) sobre conjuntos de entrenamiento, validación y prueba. Los resultados muestran que incorporar variables adicionales al modelo reduce el RMSE de prueba de \$10{,}809.73 a \$5{,}759.78 (una reducción de aproximadamente 46.7\,\%).
 \end{abstract}
 
 \begin{IEEEkeywords}
-IEEE, Artificial Intelligence, LaTeX, Template
+Regresión lineal, descenso de gradiente, aprendizaje de máquina supervisado, RMSE.
 \end{IEEEkeywords}
 
-\section{Introduction}
-This is a simple report structure using the IEEE journal format.
 
-\section{Method}
-Describe the proposed method or approach here.
+\section{Introducción}
 
-\section{Results}
-Summarize the main results here.
+La regresión lineal es un modelo del aprendizaje de máquina supervisado, y sirve para entender técnicas de optimización más complejas. Este trabajo aborda un caso de estudio de una compañía de seguros médicos que busca estimar el costo asociado a un asegurado a partir de características como su edad, sexo, índice de masa corporal (bmi), número de hijos, si es fumador y su región de residencia. Contar con una estimación adecuada de estos costos le permite a la aseguradora ajustar sus esquemas de precios y financiación.
 
-\section{Conclusion}
-Provide the concluding remarks here.
+El objetivo específico de este ejercicio fue implementar el algoritmo de descenso de gradiente para minimizar la función de costo del error cuadrático medio (MSE), y evaluar cómo cambia el desempeño del modelo al incrementar el número de variables utilizadas.
 
-\begin{thebibliography}{1}
-\bibitem{b1} A. Author, ``Title of the reference'' \emph{Journal Name}, vol. 1, no. 1, pp. 1--10, 2024.
+\section{Metodología}
+
+\subsection{Conjunto de datos}
+
+Se utilizó el conjunto de datos de costos médicos del libro \emph{Machine Learning with R} \cite{lantz2015}, compuesto por 1338 registros y 7 columnas: \texttt{age}, \texttt{sex}, \texttt{bmi}, \texttt{children}, \texttt{smoker}, \texttt{region} y \texttt{charges} (variable objetivo). Las variables categóricas \texttt{sex} y \texttt{smoker} se codificaron como variables binarias (0/1), mientras que la variable \texttt{region} (con 4 categorías) se transformó en cuatro variables \emph{dummy}.
+
+El conjunto de datos se dividió aleatoriamente en:
+\begin{itemize}
+    \item Entrenamiento: 70\,\% 
+    \item Validación: 15\,\% 
+    \item Prueba: 15\,\% 
+\end{itemize}
+
+\subsection{Modelo}
+
+Se planteó la hipótesis lineal
+\begin{equation}
+\hat{charges} = h(x)_\theta=\theta_0+\theta_1 age
+\label{eq:hipotesis}
+\end{equation}
+Inicializando con un $\theta_0$ aleatorio. Para representar el sesgo dentro del mismo producto matricial, cada matriz $X$ se ``infló'' añadiendo una columna constante de unos como primera columna.
+
+La función de costo utilizada para el entrenamiento fue el error cuadrático medio (MSE):
+\begin{equation}
+J(\theta) = \frac{1}{n}\sum_{i=1}^{n}\left(\hat{y}^{(i)} - y^{(i)}\right)^2,
+\label{eq:mse}
+\end{equation}
+y como métrica de desempeño interpretable se reportó la raíz del error cuadrático medio, $\text{RMSE} = \sqrt{J(\theta)}$, expresada en USD ( como la variable charges).
+
+\subsection{Descenso de gradiente}
+
+El vector de parámetros $\theta$ se actualiza iterativamente en la dirección opuesta al gradiente de la función de costo:
+\begin{equation}
+\theta = \theta - \alpha \,\nabla_\theta 
+\label{eq:update}
+\end{equation}
+donde $\alpha$ es la tasa de aprendizaje. Esta formula se aplicó de forma vectorizada, por lo que la implementación funciona sin cambios para cualquier número de filas $n$ y de columnas $m$ en $X$.
+
+Se implementó la función \texttt{fit\_model(alpha, epoch, X\_c, Y)}, la cual:
+\begin{enumerate}
+    \item Inicializa $\theta$ de forma aleatoria con dimensión $(m,1)$.
+    \item Ejecuta \texttt{epoch} iteraciones de la regla de actualización de la Ecuación.~\eqref{eq:update}.
+    \item Retorna el mejor $\theta$ aproximado.
+\end{enumerate}
+
+Los hiperparámetros utilizados fueron $\alpha = 0.00112$ y $100{,}000$ épocas.
+
+\section{Resultados}
+
+Se entrenaron y evaluaron tres configuraciones del modelo, manteniendo fijos $\alpha$, el número de épocas y la semilla aleatoria, con el fin de aislar el efecto de agregar variables.
+
+\begin{table}[!ht]
+\centering
+\caption{RMSE (en USD) obtenido para cada configuración del modelo}
+\label{tab:resultados}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Modelo} & \textbf{Train} & \textbf{Val.} & \textbf{Test} \\
+\midrule
+Solo \texttt{age} & 11{,}479.52 & 12{,}580.32 & 10{,}809.73 \\
+Todas las variables (con \texttt{bmi}) & \texttt{NaN} & \texttt{NaN} & \texttt{NaN} \\
+Todas menos \texttt{bmi} & 6{,}242.39 & 7{,}430.84 & \textbf{5{,}759.78} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Modelo base: una sola variable}
+Usando únicamente age como predictor, el modelo alcanzó un RMSE de prueba de \$10{,}809.73. Este resultado confirma que la edad por sí sola tiene poder predictivo sobre el costo médico, pero deja una porción considerable de la variabilidad sin explicar.
+
+\subsection{Modelo con todas las variables: divergencia numérica}
+Al incorporar todas las variables disponibles (incluyendo bmi), el algoritmo de descenso de gradiente divergió, es decir, creció sin control (overflow) y $\theta$ terminó en NaN. La posible causa de este comportamiento es la diferencia de escala entre las variables, pues mientras que las variables dummy y binarias toman valores en $\{0,1\}$, mientras age varía aproximadamente entre 18 y 64, y bmi entre 16 y 53.
+
+\subsection{Modelo sin bmi}
+Como solución práctica dentro del alcance del ejercicio, se retiró la variable bmi y se reentrenó el modelo con las variables restantes (age, sex, children, smoker y las cuatro dummies de región). Con esta configuración el algoritmo convergió correctamente, obteniendo un RMSE de prueba de \$5{,}759.78, una mejora del 46.7\,\% respecto al modelo de una sola variable.
+
+
+\section{Conclusiones}
+
+\begin{itemize}
+    \item Se implementó una función genérica de ajuste de regresión lineal mediante descenso de gradiente (\texttt{fit\_model}), capaz de operar con matrices $X$ de dimensión arbitraria, validada sobre 1 y 8 variables predictoras.
+    \item Incluir más variables relevantes en el modelo mejora el desempeño de forma significativa, ya que el RMSE de prueba se redujo de \$10{,}809.73 a \$5{,}759.78 (mejora de 46.7\,\%) al pasar de un modelo univariable a uno con ocho variables.
+    \item El descenso de gradiente sin normalizar es sensible a la escala de las variables. Incluir bmi sin normalización provocó divergencia numérica (NaN), lo que resalta la importancia del preprocesamiento (estandarización/normalización) como paso previo indispensable en el aprendizaje de máquina, más allá de simplemente "inflar" $X$ con la columna de unos.
+    \item Como trabajo futuro, se recomienda estandarizar todas las variables continuas para poder incorporar bmi.
+\end{itemize}
+
+\begin{thebibliography}{3}
+\bibitem{lantz2015} B. Lantz, \emph{Machine Learning with R}, 2nd ed. Birmingham, UK: Packt Publishing, 2015.
+
 \end{thebibliography}
 
 \end{document}
