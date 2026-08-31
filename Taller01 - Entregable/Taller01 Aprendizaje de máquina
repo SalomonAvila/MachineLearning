@@ -1,0 +1,267 @@
+\documentclass[journal]{IEEEtran}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\begin{document}
+
+\title{Taller 1: Regresión Lineal y Regresión Logística sobre el Paddy Dataset}
+\author{Author Name}
+\maketitle
+
+\begin{abstract}
+Este documento presenta el desarrollo del Taller 1 de la Maestría en Inteligencia Artificial, curso de Aprendizaje de Máquina. Se implementan desde cero, utilizando únicamente NumPy para los cálculos vectorizados, un modelo de regresión lineal (Punto 1) y un modelo de regresión logística (Punto 2) sobre el conjunto de datos Paddy Dataset de UCI Machine Learning Repository.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Regresión lineal, Regresión logística, Descenso de gradiente, NumPy, Regularización L2, Paddy Dataset
+\end{IEEEkeywords}
+
+%======================================================================
+% ===================== PUNTO 1 (PLACEHOLDER) =========================
+%======================================================================
+\section{Punto 1: Regresión Lineal}
+% TODO: Completar esta sección con el contenido del Punto 1.
+
+\subsection{Exploración de datos}
+% TODO
+
+\subsection{Partición de datos}
+% TODO
+
+\subsection{Implementación del modelo}
+% TODO
+
+\subsection{Experimentación}
+% TODO
+
+\subsection{Evaluación final}
+% TODO
+
+\subsection{Análisis de resultados y conclusiones}
+% TODO
+
+%======================================================================
+% ===================== PUNTO 2 (COMPLETO) ============================
+%======================================================================
+\section{Punto 2: Regresión Logística}
+
+\subsection{Exploración de datos}
+
+\subsubsection{Limpieza}
+Se realiza una limpieza inicial sobre la variable objetivo \texttt{Variety}. Se eliminan los registros correspondientes a la variedad \emph{delux ponni}, dado que el problema se plantea como una \textbf{clasificación binaria} y se trabaja únicamente con las variedades \emph{ponmani} y \emph{CO\_43}. Posteriormente, la variable categórica \texttt{Variety} se transforma a valores numéricos de la siguiente manera:
+\begin{itemize}
+    \item \emph{ponmani} $\rightarrow 0$
+    \item \emph{CO\_43} $\rightarrow 1$
+\end{itemize}
+Esta transformación permite utilizar \texttt{Variety} como variable objetivo binaria dentro del modelo de regresión logística.
+
+\subsubsection{Correlación}
+Se calcula la correlación entre cada variable predictora numérica y la variable objetivo \texttt{Variety}, con el propósito de identificar qué variables presentan mayor relación lineal con la clase a predecir. Los resultados muestran que la mayoría de las variables presentan una correlación cercana a cero, y la variable con mayor correlación en valor absoluto es \texttt{Trash(in bundles)}, con aproximadamente $-0.13$.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\columnwidth]{correlacion_variety.png}
+    \caption{Correlación de Pearson de las variables numéricas con la variable objetivo \texttt{Variety}.}
+    \label{fig:correlacion_variety}
+\end{figure}
+% Nombre de imagen sugerido: correlacion_variety.png  (celda 59 del notebook)
+
+\paragraph{Identificación de variables redundantes}
+Al analizar la correlación entre algunas variables agrícolas se observa que presentan una correlación de $1.0$ entre sí, lo que indica que contienen información completamente redundante. Por esta razón se eliminan las variables:
+\begin{itemize}
+    \item \texttt{Seedrate(in Kg)}
+    \item \texttt{LP\_Mainfield(in Tonnes)}
+    \item \texttt{Nursery area (Cents)}
+    \item \texttt{LP\_nurseryarea(in Tonnes)}
+    \item \texttt{DAP\_20days}
+\end{itemize}
+conservando \texttt{Hectares} como representante de este grupo altamente correlacionado.
+
+\subsubsection{Transformación}
+Se transforman las variables categóricas y las relacionadas con la dirección del viento para que puedan ser utilizadas correctamente por el modelo de regresión logística. La dirección del viento (\texttt{N}, \texttt{NE}, \texttt{S}, \texttt{SW}, etc.) es una variable de naturaleza \emph{circular}: por ejemplo, \texttt{N} y \texttt{NNW} están próximas entre sí, relación que una codificación numérica convencional no capturaría correctamente. Por ello, cada dirección se convierte primero a grados ($\theta$) y luego se codifica mediante seno y coseno:
+
+\begin{equation}
+x_{\sin} = \sin(\theta)
+\label{eq:wind_sin}
+\end{equation}
+
+\begin{equation}
+x_{\cos} = \cos(\theta)
+\label{eq:wind_cos}
+\end{equation}
+
+De esta manera se conserva la naturaleza circular de la dirección del viento. Las demás variables categóricas se convierten mediante \textbf{One-Hot Encoding}, utilizando \texttt{drop\_first=True} para eliminar una categoría de referencia por variable y evitar colinealidad perfecta con el término de sesgo.
+
+\subsection{Partición de datos}
+Se separan las variables predictoras $X$ de la variable objetivo $y$, donde \texttt{Variety} representa la clase a predecir. El conjunto de datos se divide en tres subconjuntos, utilizando \texttt{random\_state=200} para garantizar reproducibilidad:
+\begin{itemize}
+    \item \textbf{Train (70\%):} para ajustar los parámetros del modelo.
+    \item \textbf{Validation (15\%):} para comparar configuraciones y seleccionar el mejor modelo.
+    \item \textbf{Test (15\%):} reservado para la evaluación final, usado una única vez.
+\end{itemize}
+
+\subsection{Implementación del modelo}
+
+Se implementa manualmente el entrenamiento de una regresión logística mediante \textbf{descenso de gradiente}. El modelo calcula inicialmente una combinación lineal de las características:
+
+\begin{equation}
+z = X\theta
+\label{eq:linear_combination}
+\end{equation}
+
+donde $X$ es la matriz de características (con la columna de sesgo incluida), $\theta$ son los parámetros del modelo y $z$ es la combinación lineal resultante.
+
+Para convertir esta combinación lineal en una probabilidad se utiliza la función sigmoide:
+
+\begin{equation}
+\sigma(z) = \frac{1}{1+e^{-z}}
+\label{eq:sigmoid}
+\end{equation}
+
+Por lo tanto, la probabilidad estimada de pertenecer a la clase 1 es:
+
+\begin{equation}
+\hat{y} = \sigma(X\theta)
+\label{eq:yhat}
+\end{equation}
+
+\subsubsection{Función de costo}
+El error del modelo se mide mediante \textbf{Log-Loss}:
+
+\begin{equation}
+J(\theta) = -\frac{1}{n}\sum_{i=1}^{n}\left[y_i\log(\hat{y}_i) + (1-y_i)\log(1-\hat{y}_i)\right]
+\label{eq:logloss}
+\end{equation}
+
+Esta función penaliza fuertemente las predicciones que asignan una probabilidad incorrecta a la clase real. Adicionalmente, el modelo incorpora regularización L2:
+
+\begin{equation}
+J_{reg}(\theta) = J(\theta) + \frac{\lambda}{2n}\sum_{j=1}^{m}\theta_j^2
+\label{eq:logloss_reg}
+\end{equation}
+
+La regularización evita que los pesos del modelo tomen valores excesivamente grandes. El término correspondiente al sesgo ($\theta_0$) nunca se regulariza.
+
+\subsubsection{Actualización de los parámetros}
+El gradiente de la función de costo se calcula Con regularización:
+
+\begin{equation}
+\nabla J_{reg}(\theta) = \frac{1}{n}X^\top(\hat{y}-y) + \frac{\lambda}{n}\theta
+\label{eq:grad_reg}
+\end{equation}
+
+sin aplicar la penalización al término de sesgo. Finalmente, los parámetros se actualizan mediante descenso de gradiente:
+
+\begin{equation}
+\theta := \theta - \alpha\nabla J_{reg}(\theta)
+\label{eq:update}
+\end{equation}
+
+donde $\alpha$ es la tasa de aprendizaje, que determina el tamaño de cada paso de la optimización. El proceso se repite durante el número de épocas establecido, almacenando el costo periódicamente para analizar la convergencia del algoritmo.
+
+\subsection{Verificación de la implementación}
+Antes de utilizar el modelo completo, se realiza una prueba controlada utilizando únicamente la variable \texttt{Hectares}. El objetivo de esta etapa no es obtener el mejor clasificador, sino verificar que la implementación del descenso de gradiente funciona correctamente.
+
+Primero se estandariza la variable:
+
+\begin{equation}
+x' = \frac{x-\mu}{\sigma}
+\label{eq:standardize}
+\end{equation}
+
+y posteriormente se agrega el término de sesgo para que el modelo pueda aprender el intercepto. Se entrena el modelo durante 2000 épocas, con una tasa de aprendizaje $\alpha = 0.1$ y una regularización $\lambda = 0.05$.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\columnwidth]{convergencia_verificacion_logistica.png}
+    \caption{Convergencia del descenso de gradiente en la prueba de verificación (modelo con únicamente \texttt{Hectares}).}
+    \label{fig:convergencia_verificacion}
+\end{figure}
+% Nombre de imagen sugerido: convergencia_verificacion_logistica.png (celda 76 del notebook)
+
+La curva de costo confirma que el algoritmo converge de forma decreciente.
+
+\subsection{Evaluación del modelo de verificación}
+Una vez entrenado el modelo de prueba, se calculan las probabilidades predichas mediante la función sigmoide (Ec.~\ref{eq:sigmoid}). Para convertir estas probabilidades en clases se utiliza un umbral de $0.5$:
+
+\begin{equation}
+\hat{y} =
+\begin{cases}
+1 & \text{si } P(y=1|x)\geq 0.5\\
+0 & \text{si } P(y=1|x)< 0.5
+\end{cases}
+\label{eq:threshold}
+\end{equation}
+
+Posteriormente se construye la matriz de confusión y se calculan Accuracy, Precision, Recall y F1-score. En esta prueba, el modelo predice todos los registros como clase 0, lo que genera un \textbf{Accuracy de aproximadamente 59.36\%}, pero Precision, Recall y F1-score para la clase 1 son iguales a cero. Este resultado muestra que, aunque el algoritmo de optimización converge correctamente, utilizar únicamente \texttt{Hectares} no proporciona suficiente información para distinguir adecuadamente entre las dos variedades.
+
+\subsection{Construcción progresiva de las hipótesis}
+Para estudiar cómo influye la selección de variables en el desempeño del modelo, se plantearon inicialmente diferentes modelos de forma progresiva (M1 a M5, de menor a mayor cantidad de variables). Durante la evaluación se encontró un comportamiento inesperado: al combinar \texttt{Trash(in bundles)} con cualquiera de las variables agrícolas se obtenía un desempeño del \textbf{100\%}. Este resultado se consideró una señal de alerta, ya que un desempeño perfecto puede indicar redundancia, una relación extremadamente fuerte entre variables o incluso fuga de información.
+
+Por esta razón, se modificó la estrategia de construcción de modelos para estudiar por separado el efecto de \texttt{Trash} y evitar que su combinación con las variables agricolas, se realizó las siguientes configuraciones:
+
+\begin{itemize}
+    \item \textbf{M1:} Todas las variables, excepto \texttt{Trash(in bundles)}.
+    \item \textbf{M2:} Únicamente \texttt{Trash(in bundles)}.
+    \item \textbf{M3:} Todas las variables, excluyendo las variables agrícolas, más \texttt{Trash}.
+    \item \textbf{M4:} Subconjunto reducido de variables con mayor correlación observada con \texttt{Variety}.
+\end{itemize}
+
+Para cada configuración se realizó una búsqueda de hiperparámetros sobre una grilla de tasas de aprendizaje $\alpha \in \{0.001, 0.01, 0.1\}$, número de épocas $\in \{1000, 2000, 5000\}$ y coeficientes de regularización $\lambda \in \{0.0, 0.01, 0.05, 0.1, 1.0\}$, evaluando siempre sobre el conjunto de validación.
+
+\subsection{Selección del mejor modelo y evaluación en test}
+Después de entrenar y evaluar las diferentes configuraciones, se compararon sus resultados utilizando las métricas de clasificación. El modelo seleccionado fue \textbf{M3}, con los siguientes hiperparámetros:
+\begin{itemize}
+    \item $\alpha = 0.1$
+    \item Épocas $= 5000$
+    \item $\lambda = 0.0$
+\end{itemize}
+
+En el conjunto de validación obtuvo:
+\begin{itemize}
+    \item Accuracy: \textbf{89.96\%}
+    \item Precision: \textbf{94.38\%}
+    \item Recall: \textbf{79.25\%}
+    \item F1-score: \textbf{86.15\%}
+\end{itemize}
+
+Una vez seleccionado M3 utilizando el conjunto de validación, se realizó la evaluación final utilizando exclusivamente el conjunto de \textbf{test}. El modelo final obtuvo:
+\begin{itemize}
+    \item Accuracy: \textbf{89.96\%}
+    \item Precision: \textbf{94.06\%}
+    \item Recall: \textbf{81.90\%}
+    \item F1-score: \textbf{87.56\%}
+    \item Log-loss: \textbf{0.3502}
+\end{itemize}
+
+\begin{table}[h]
+\centering
+\caption{Matriz de confusión del modelo M3 sobre el conjunto de test.}
+\label{tab:confusion_matrix}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+ & \textbf{Predicción 0} & \textbf{Predicción 1} \\
+\midrule
+\textbf{Real 0} & 147 & 6 \\
+\textbf{Real 1} & 21  & 95 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+El modelo clasifica correctamente la gran mayoría de los registros de ambas clases. En particular, se observan pocos falsos positivos (6), mientras que se presentan 21 falsos negativos. El Accuracy cercano al 90\% y el F1-score de aproximadamente 0.876 indican un buen desempeño general en el conjunto de prueba. La comparación entre validación y test también muestra resultados similares, lo que constituye una señal favorable de que el modelo mantiene su capacidad predictiva sobre datos no utilizados durante el entrenamiento.
+
+\subsection{Análisis de resultados y conclusiones}
+
+La implementación del modelo de regresión logística demuestra que la calidad predictiva depende fundamentalmente de una rigurosa curación de los datos. La exclusión temprana de variables altamente colineales y el tratamiento cuidadoso de \texttt{Trash(in bundles)} resultaron ser decisiones críticas para evitar la fuga de información.
+
+Por otro lado, el modelo final (\textbf{M3}) exhibe una sólida capacidad de generalización, manteniendo un \emph{Accuracy} del 89.96\% en el conjunto de prueba, sin caídas drásticas respecto a la validación. El balance entre su \emph{Precision} (94.06\%) y \emph{Recall} (81.90\%) revela un clasificador estricto que es sumamente preciso al predecir la clase positiva, minimizando la tasa de falsos positivos a cambio de permitir algunos falsos negativos.
+
+\begin{thebibliography}{1}
+\bibitem{b1} UCI Machine Learning Repository, ``Paddy Dataset,'' \emph{archive.ics.uci.edu}, 2024. [Online]. Available: https://archive.ics.uci.edu/dataset/1186/paddy+dataset
+\end{thebibliography}
+
+\end{document}
