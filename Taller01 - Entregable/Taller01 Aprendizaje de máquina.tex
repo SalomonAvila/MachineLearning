@@ -22,28 +22,136 @@ Regresión lineal, Regresión logística, Descenso de gradiente, NumPy, Regulari
 \end{IEEEkeywords}
 
 %======================================================================
-% ===================== PUNTO 1 (PLACEHOLDER) =========================
+% ===================== PUNTO 1 =========================
 %======================================================================
 \section{Punto 1: Regresión Lineal}
-% TODO: Completar esta sección con el contenido del Punto 1.
 
 \subsection{Exploración de datos}
-% TODO
+
+La variable objetivo \texttt{Productividad} no existe en el dataset original. Se construye dividiendo el rendimiento total entre las hectáreas cultivadas:
+
+\begin{equation}
+\text{Productividad} = \frac{\text{Paddy yield}}{\text{Hectares}}
+\label{eq:productividad}
+\end{equation}
+
+Una vez calculada, la columna \texttt{Paddy yield} se elimina del conjunto de variables predictoras, ya que la propia definición de la variable objetivo depende de ella de forma determinista. La distribución de \texttt{Productividad} muestra una desviación estándar pequeña frente a su media, lo que anticipa que el margen de mejora frente a una predicción constante es limitado.
+
+\subsubsection{Correlación de Pearson}
+Para orientar la selección de variables se calcula la correlación entre cada variable numérica y la productividad. A diferencia de una simple llamada a una función de una librería, el coeficiente se implementa desde cero de forma vectorizada con NumPy, siguiendo su definición matemática:
+
+\begin{equation}
+r = \frac{\sum_i (x_i-\bar{x})(y_i-\bar{y})}{\sqrt{\sum_i (x_i-\bar{x})^2}\sqrt{\sum_i (y_i-\bar{y})^2}}
+\label{eq:pearson}
+\end{equation}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\columnwidth]{correlacion_productividad.png}
+    \caption{Correlación de Pearson de las variables numéricas con la variable objetivo Productividad.}
+    \label{fig:correlacion_productividad}
+\end{figure}
+
+\subsubsection{Identificación de variables redundantes}
+Un grupo de diez variables agronómicas presenta exactamente la misma correlación con la productividad, lo que resulta sospechoso. Para confirmar que se trata de copias redundantes de \texttt{Hectares} bajo otra escala, se calcula la desviación estándar de la razón entre cada variable y \texttt{Hectares}. El resultado es una correlación de $1.0$ frente a \texttt{Hectares} y una desviación estándar de $0.0$ en dicha razón para las diez variables, lo que demuestra matemáticamente que corresponden a transformaciones lineales deterministas de \texttt{Hectares}. En consecuencia se descartan estas diez variables, conservando únicamente \texttt{Hectares} como representante del grupo.
+
+Adicionalmente, \texttt{Trash} muestra una correlación de $0.56$ con la productividad y de $0.96$ con el rendimiento total, muy por encima del resto de las variables climáticas y agronómicas. Siguiendo el mismo criterio de descartar variables con correlación extremadamente alta frente al resto, se elimina \texttt{Trash} del conjunto de predictores.
+
+\subsubsection{Transformación de variables}
+Las variables categóricas nominales, incluida la dirección del viento en cada ventana de tiempo, se convierten a variables dummy mediante codificación one hot, eliminando una categoría de referencia por variable para evitar colinealidad perfecta con el término de sesgo.
 
 \subsection{Partición de datos}
-% TODO
+El dataset se particiona en tres subconjuntos, utilizando \texttt{random\_state=200} para garantizar reproducibilidad:
+\begin{itemize}
+    \item \textbf{Train (70\%):} para ajustar los parámetros $\theta$.
+    \item \textbf{Validation (15\%):} para comparar hipótesis e hiperparámetros y seleccionar el modelo.
+    \item \textbf{Test (15\%):} para estimar el error final sobre datos no vistos, utilizado únicamente al final.
+\end{itemize}
 
 \subsection{Implementación del modelo}
-% TODO
+Se implementa un modelo de regresión lineal múltiple con descenso de gradiente por lotes, función de costo MSE y regularización L2. La hipótesis del modelo es:
+
+\begin{equation}
+\hat{y} = X\theta
+\label{eq:hipotesis_lineal}
+\end{equation}
+
+donde $X$ incluye la columna de sesgo. La función de costo regularizada, con el término de penalización escalado por $m$, el número de variables sin contar el sesgo, es:
+
+\begin{equation}
+J(\theta) = \frac{1}{2n}\sum_{i=1}^{n} (x_i^\top\theta - y_i)^2 + \frac{1}{2m}\lambda\sum_{j=1}^{m}\theta_j^2
+\label{eq:mse_reg}
+\end{equation}
+
+y el gradiente correspondiente es:
+
+\begin{equation}
+\nabla J(\theta) = \frac{1}{n}X^\top(X\theta-y) + \frac{\lambda}{m}\theta
+\label{eq:grad_lineal}
+\end{equation}
+
+sin aplicar la penalización al término de sesgo $\theta_0$. Los parámetros se actualizan mediante:
+
+\begin{equation}
+\theta := \theta - \alpha\nabla J(\theta)
+\label{eq:update_lineal}
+\end{equation}
+
+Antes de estandarizar, las variables numéricas presentan escalas muy distintas entre sí, por lo que el descenso de gradiente diverge si se aplica directamente sobre los datos crudos. Por ello cada variable se estandariza restando la media y dividiendo por la desviación estándar del conjunto de entrenamiento, y esos mismos estadísticos se reutilizan sobre validación y test.
+
+\subsubsection{Verificación de la implementación}
+Antes de experimentar con el modelo completo, se verifica que el descenso de gradiente reduce la función de costo de forma monótona en un caso simple, entrenando durante 2000 épocas con $\alpha=0.1$ sin regularización.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\columnwidth]{convergencia_verificacion_lineal.png}
+    \caption{Convergencia del descenso de gradiente en la prueba de verificación.}
+    \label{fig:convergencia_verificacion_lineal}
+\end{figure}
+
+La curva de costo decrece de forma monótona y se estabiliza, lo que confirma que la implementación es correcta y numéricamente estable.
 
 \subsection{Experimentación}
-% TODO
+Se comparan tres hipótesis de complejidad creciente, evaluadas siempre con el error de validación:
+\begin{itemize}
+    \item \textbf{Modelo A:} únicamente variables numéricas originales.
+    \item \textbf{Modelo B:} Modelo A más variables categóricas como variables dummy.
+    \item \textbf{Modelo C:} Modelo B más términos polinómicos cuadráticos de variables climáticas relevantes.
+\end{itemize}
+
+Sobre el Modelo C, y utilizando la tasa de aprendizaje $\alpha=0.05$ ya validada, se prueban distintos valores de $\lambda$ para obtener el Modelo D, comparando el RMSE de validación de cada configuración y eligiendo el valor que lo minimiza.
+
+\begin{table}[h]
+\centering
+\caption{Comparación de RMSE por hipótesis sobre el conjunto de validación.}
+\label{tab:rmse_modelos}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Modelo} & \textbf{RMSE train} & \textbf{RMSE val} \\
+\midrule
+A: numéricas & 226.48 & 210.53 \\
+B: más categóricas & 225.40 & 210.55 \\
+C: más polinomios & 225.40 & 210.55 \\
+D: Ridge & 225.40 & 210.55 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+El barrido de valores de $\lambda$ sobre el Modelo C selecciona $\lambda=0.0$ como óptimo, ya que valores mayores solo incrementan el RMSE de validación. El Modelo D se entrena entonces con $\alpha=0.05$ y $\lambda=0.0$.
 
 \subsection{Evaluación final}
-% TODO
+Una vez seleccionado el Modelo D con el conjunto de validación, se evalúa una única vez sobre el conjunto de test. El modelo obtiene un RMSE de test de $228.09$ Kg por hectárea, frente a una desviación estándar de la productividad de $283.24$ Kg por hectárea y una media de $5990.53$ Kg por hectárea.
 
 \subsection{Análisis de resultados y conclusiones}
-% TODO
+El error del modelo final es considerablemente menor que la variabilidad natural de la productividad, lo que indica una mejora real sobre predecir siempre la media, aunque sin llegar a un ajuste muy alto.
+
+Estandarizar las variables utilizando únicamente los estadísticos del conjunto de entrenamiento resultó indispensable para la convergencia del descenso de gradiente. Detectar y eliminar variables redundantes antes de modelar también fue una decisión metodológica clave, y se verificó que eliminarlas no empeora el desempeño de validación ni de test, lo que confirma que no aportaban señal adicional relevante.
+
+Agregar variables categóricas produjo una mejora pequeña pero consistente sobre el error de validación del Modelo A. En contraste, los términos polinómicos del Modelo C no mejoraron el error de validación frente al Modelo B, lo que sugiere que la relación entre las variables climáticas disponibles y la productividad no es fuertemente no lineal, sino una señal débil distribuida entre muchos factores agroclimáticos.
+
+La regularización L2 tampoco aportó una mejora adicional, ya que el barrido de $\lambda$ seleccionó $\lambda=0.0$ como óptimo. Esto es consistente con que, una vez eliminadas las variables redundantes, el modelo ya no presenta una multicolinealidad severa que penalizar.
+
+El dataset probablemente mezcla parcelas con prácticas de manejo no observadas, lo que limita el techo de desempeño alcanzable con un modelo lineal, y un modelo de esta naturaleza puede estar subestimando interacciones más complejas entre variables climáticas y agronómicas.
 
 %======================================================================
 % ===================== PUNTO 2 (COMPLETO) ============================
