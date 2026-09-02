@@ -26,3 +26,4 @@
 *.glg
 *.glo
 *.gls
+venv_stable/*
