@@ -27,3 +27,4 @@
 *.glo
 *.gls
 venv_stable/*
+.vscode
