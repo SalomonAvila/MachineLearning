@@ -1,0 +1,6 @@
+uci:
+  type: web
+  title: "Drug Consumption (Quantified)"
+  author: "UCI Machine Learning Repository"
+  date: 2016
+  url: https://archive.ics.uci.edu/dataset/373/drug+consumption+quantified
