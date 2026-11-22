@@ -13,6 +13,7 @@ Repositorio con los laboratorios y talleres del curso de Aprendizaje de Máquina
 | `Taller01 - Entregable` | Versión entregada del Taller 1 con su informe |
 | `Taller02` | Redes neuronales artificiales |
 | `Taller03` | Agrupamiento K-Means y jerárquico aglomerativo con su informe |
+| `Taller04` | Detección de anomalías en el test de MNIST con One-Class SVM y kernel RBF |
 
 ## Entorno
 
